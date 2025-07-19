@@ -2,8 +2,8 @@
 // Created by mohammadmahdi on 7/18/25.
 //
 
-#ifndef TAGE_H
-#define TAGE_H
+#ifndef TAGE2_H
+#define TAGE2_H
 #include <algorithm>
 #include <array>
 #include <bitset>
@@ -28,8 +28,9 @@ public:
   champsim::msl::fwcounter<3> predCounter;
   unsigned long long tag;
   champsim::msl::fwcounter<2> uCounter;
-  Entry (champsim::msl::fwcounter<3> predCounter, unsigned long long tag, champsim::msl::fwcounter<2> uCounter)
-    : predCounter(predCounter), tag(tag), uCounter(uCounter) {}
+  Entry(champsim::msl::fwcounter<3> predCounter, unsigned long long tag, champsim::msl::fwcounter<2> uCounter)
+      : predCounter(predCounter), tag(tag), uCounter(uCounter) {}
+  Entry() : predCounter(0), tag(0), uCounter(0) {}
 };
 
 class Table
@@ -43,10 +44,11 @@ class Table
     {
       entries.resize(histLength);
     }
+    Table () : histLength(0), tagWidth(0) {}
 };
 
 
-class Tage : public champsim::modules::branch_predictor
+class tage2 : champsim::modules::branch_predictor
 {
 public:
   bimodal biPred;
@@ -65,6 +67,9 @@ public:
   bool uResetType1 = true; //type 1 is with most significant bit and if not, the least significant
 
   std::vector<Table> tables;
+
+  using branch_predictor::branch_predictor;
+  tage2(O3_CPU* cpu): branch_predictor(cpu), biPred(cpu) {}
 
   bool predict_branch(champsim::address ip);
   void last_branch_result(champsim::address ip, champsim::address branch_target, bool taken, uint8_t branch_type);

@@ -2,16 +2,17 @@
 // Created by mohammadmahdi on 7/18/25.
 //
 
-#include "tage.h"
+#include "tage2.h"
 #include <random>
 
 
-void Tage::initialize_branch_predictor()
+void tage2::initialize_branch_predictor()
 {
   tables.resize(numOfTables);
   for (int i = 0; i < numOfTables; i++) {
     tables[i].tagWidth = 8;           // to change later
     tables[i].histLength = static_cast<int>(histLenBase * pow(alpha, i - 1) + 0.5);
+    tables[i].entries.resize(numOfEntries);
     for (int j = 1; j < numOfEntries; j++) {
       tables[i].entries[j].predCounter = champsim::msl::fwcounter<3>(4);
       tables[i].entries[j].uCounter = champsim::msl::fwcounter<2>(0);
@@ -48,7 +49,7 @@ unsigned long long hash_tag(champsim::address ip, std::bitset<5500> GHR, const T
 
   return tag & ((1 << table.tagWidth) - 1); 
 }
-bool Tage::predict_branch(champsim::address ip)
+bool tage2::predict_branch(champsim::address ip)
 {
   providerIdx = -1;
   alterIdx = -1;
@@ -88,9 +89,9 @@ bool Tage::predict_branch(champsim::address ip)
   return finalPrediction; //if the base predictor is used we will consider it as an alter prediction
 }
 
-void Tage::reset_u() {
-  for(Table table : tables) {
-    for (Entry entry : table.entries) {
+void tage2::reset_u() {
+  for(Table& table : tables) {
+    for (Entry& entry : table.entries) {
       if(uResetType1){
         entry.uCounter = champsim::msl::fwcounter<2>(entry.uCounter.value() & 0b01);
       }else{
@@ -109,7 +110,7 @@ int weighted_random_choice(const std::vector<double>& probabilities) {
   return dist(gen);  // returns index of chosen item
 }
 
-void Tage::last_branch_result(champsim::address ip, champsim::address branch_target, bool taken, uint8_t branch_type)
+void tage2::last_branch_result(champsim::address ip, champsim::address branch_target, bool taken, uint8_t branch_type)
 {
   biPred.last_branch_result(ip, branch_target, taken, branch_type);
   if(providerIdx != -1) {
@@ -150,7 +151,7 @@ void Tage::last_branch_result(champsim::address ip, champsim::address branch_tar
     for(int i = 0; i < probability.size(); i++) {
       probability.at(i) /= sum;
     }
-    Table chosenTable = allocatbaleTables.at(weighted_random_choice(probability));
+    Table& chosenTable = allocatbaleTables.at(weighted_random_choice(probability));
     unsigned long long index = hash_index(ip, GHR, chosenTable, numOfEntries);
     Entry newEntry = Entry(champsim::msl::fwcounter<3>(4), hash_tag(ip, GHR, chosenTable), champsim::msl::fwcounter<2>(0));
     chosenTable.entries[index] = newEntry;
