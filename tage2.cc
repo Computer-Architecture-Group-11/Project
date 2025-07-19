@@ -140,21 +140,25 @@ void tage2::last_branch_result(champsim::address ip, champsim::address branch_ta
       for(int i = numOfTables - 1; i > providerIdx; i--) {
         tables[i].entries[hash_index(ip, GHR, tables[i], numOfEntries)].uCounter--;         
       }
+    } else {
+      double sum = 0;
+      std::vector<double> probability;
+      probability.push_back(1);
+      for(Table table : allocatbaleTables){
+        probability.push_back(probability.back() / 2);
+        sum += probability.back();
+      }
+      sum -= probability.back();
+      probability.pop_back();
+      for(int i = 0; i < probability.size(); i++) {
+        probability.at(i) /= sum;
+      }
+      Table& chosenTable = allocatbaleTables.at(weighted_random_choice(probability));
+      unsigned long long index = hash_index(ip, GHR, chosenTable, numOfEntries);
+      Entry newEntry = Entry(champsim::msl::fwcounter<3>(4), hash_tag(ip, GHR, chosenTable), champsim::msl::fwcounter<2>(0));
+      chosenTable.entries[index] = newEntry;
     }
-    double sum = 0;
-    std::vector<double> probability;
-    probability.push_back(1);
-    for(Table table : allocatbaleTables){
-      probability.push_back(probability.back() / 2);
-      sum += probability.back();
-    }
-    for(int i = 0; i < probability.size(); i++) {
-      probability.at(i) /= sum;
-    }
-    Table& chosenTable = allocatbaleTables.at(weighted_random_choice(probability));
-    unsigned long long index = hash_index(ip, GHR, chosenTable, numOfEntries);
-    Entry newEntry = Entry(champsim::msl::fwcounter<3>(4), hash_tag(ip, GHR, chosenTable), champsim::msl::fwcounter<2>(0));
-    chosenTable.entries[index] = newEntry;
+    
   }
 
  
