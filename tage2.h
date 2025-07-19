@@ -55,13 +55,19 @@ public:
   double alpha = 1.6;
   int histLenBase = 4;
   int clock = 0;
+  int resetClock = 256 * 1024;
   std::bitset<5500> GHR;
+  bool providerPrediction;
+  bool alterPrediction;
+  int providerIdx = -1;
+  int alterIdx = -1;
+  bool uResetType1 = true; //type 1 is with most significant bit and if not, the least significant
 
   std::vector<Table> tables;
 
   bool predict_branch(champsim::address ip);
   void last_branch_result(champsim::address ip, champsim::address branch_target, bool taken, uint8_t branch_type);
   void initialize_branch_predictor();
-
+  void reset_u();
 };
 #endif //TAGE2_H

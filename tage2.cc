@@ -41,18 +41,17 @@ unsigned long long hash_index(champsim::address ip, std::bitset<5500> GHR, const
 
 unsigned long long hash_tag(champsim::address ip, std::bitset<5500> GHR, const Table& table)
 {
-  int compLength = static_cast<int>(log2(table.histLength));
   auto pc = ip.to<unsigned long long>();
   unsigned long long folded_history = foldHist(GHR, table.histLength, table.tagWidth);
 
   unsigned long long tag = pc ^ (pc >> 3) ^ (folded_history << 1);
 
-  return index % table.tagWidth; // compLength = log2(table_size)
+  return tag & ((1 << table.tagWidth) - 1); 
 }
 bool Tage::predict_branch(champsim::address ip)
 {
-  int providerIdx = -1;
-  int alterIdx = -1;
+  providerIdx = -1;
+  alterIdx = -1;
   int index_pred;
   int alter_pred;
   for (int i = numOfTables - 1; i >= 0; i--) {
@@ -70,21 +69,65 @@ bool Tage::predict_branch(champsim::address ip)
       }
     }
   }
+  alterPrediction = biPred.predict_branch(ip);
   if (providerIdx != -1) {
-    if (tables[providerIdx].entries[index_pred].predCounter != 3 ||
-        tables[providerIdx].entries[index_pred].predCounter != 4 ||
-        tables[providerIdx].entries[index_pred].uCounter != 0 ||
-        alterIdx == -1) {        //TODO if alter was many times better
-      return tables[providerIdx].entries[index_pred].predCounter >= 4;
-    } else {
-      return tables[alterIdx].entries[alter_pred].predCounter >= 4;
+    if(alterIdx != -1) {
+      alterPrediction = tables[alterIdx].entries[alter_pred].predCounter >= 4;
     }
-  } else return biPred.predict_branch(ip);
+    if ((tables[providerIdx].entries[index_pred].predCounter != 3 &&
+        tables[providerIdx].entries[index_pred].predCounter != 4 ) ||
+        tables[providerIdx].entries[index_pred].uCounter.value() != 0) {   
+               //TODO if alter was many times better
+      providerPrediction = tables[providerIdx].entries[index_pred].predCounter >= 4;
+      return providerPrediction;
+    } 
+  } 
+  return alterPrediction; //if the base predictor is used we will consider it as an alter prediction
+}
+
+void Tage::reset_u() {
+  for(Table table : tables) {
+    for (Entry entry : table.entries) {
+      if(uResetType1){
+        entry.uCounter = champsim::msl::fwcounter<2>(entry.uCounter.value() & 0b01);
+      }else{
+        entry.uCounter = champsim::msl::fwcounter<2>(entry.uCounter.value() & 0b10);
+      }
+    }
+  }
+  uResetType1 = !uResetType1;
 }
 
 void Tage::last_branch_result(champsim::address ip, champsim::address branch_target, bool taken, uint8_t branch_type)
 {
+  biPred.last_branch_result(ip, branch_target, taken, branch_type);
+  bool prediction = alterPrediction;
+  if(providerIdx != -1) {
+    unsigned long long idx = hash_index(ip, GHR, tables[providerIdx], numOfEntries);
+    if(taken) {
+      tables[providerIdx].entries[idx].predCounter++;
+    } else {
+      tables[providerIdx].entries[idx].predCounter--;
+    }
 
+    if(providerPrediction != alterPrediction){
+      if(providerPrediction == taken) {
+        tables[providerIdx].entries[idx].uCounter++;
+      } else {
+        tables[providerIdx].entries[idx].uCounter--;
+      }
+    }
+  }
+
+ 
+  GHR <<= 1;
+  GHR[0] = taken;
+  clock++;
+  if(clock >= resetClock){
+    clock = 0;
+    reset_u();
+  }
+  
 }
 
 
