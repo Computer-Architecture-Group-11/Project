@@ -2,8 +2,8 @@
 // Created by mohammadmahdi on 7/18/25.
 //
 
-#ifndef TAGE2_H
-#define TAGE2_H
+#ifndef TAGE_H
+#define TAGE_H
 #include <algorithm>
 #include <array>
 #include <bitset>
@@ -59,6 +59,7 @@ public:
   std::bitset<5500> GHR;
   bool providerPrediction;
   bool alterPrediction;
+  bool finalPrediction;
   int providerIdx = -1;
   int alterIdx = -1;
   bool uResetType1 = true; //type 1 is with most significant bit and if not, the least significant

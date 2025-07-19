@@ -2,8 +2,8 @@
 // Created by mohammadmahdi on 7/18/25.
 //
 
-#include "tage2.h"
-
+#include "tage.h"
+#include <random>
 
 
 void Tage::initialize_branch_predictor()
@@ -70,6 +70,7 @@ bool Tage::predict_branch(champsim::address ip)
     }
   }
   alterPrediction = biPred.predict_branch(ip);
+  finalPrediction = alterPrediction;
   if (providerIdx != -1) {
     if(alterIdx != -1) {
       alterPrediction = tables[alterIdx].entries[alter_pred].predCounter >= 4;
@@ -79,10 +80,12 @@ bool Tage::predict_branch(champsim::address ip)
         tables[providerIdx].entries[index_pred].uCounter.value() != 0) {   
                //TODO if alter was many times better
       providerPrediction = tables[providerIdx].entries[index_pred].predCounter >= 4;
-      return providerPrediction;
-    } 
+      finalPrediction = providerPrediction;
+    }else{
+      finalPrediction = alterPrediction;
+    }
   } 
-  return alterPrediction; //if the base predictor is used we will consider it as an alter prediction
+  return finalPrediction; //if the base predictor is used we will consider it as an alter prediction
 }
 
 void Tage::reset_u() {
@@ -98,10 +101,17 @@ void Tage::reset_u() {
   uResetType1 = !uResetType1;
 }
 
+int weighted_random_choice(const std::vector<double>& probabilities) {
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+
+  std::discrete_distribution<> dist(probabilities.begin(), probabilities.end());
+  return dist(gen);  // returns index of chosen item
+}
+
 void Tage::last_branch_result(champsim::address ip, champsim::address branch_target, bool taken, uint8_t branch_type)
 {
   biPred.last_branch_result(ip, branch_target, taken, branch_type);
-  bool prediction = alterPrediction;
   if(providerIdx != -1) {
     unsigned long long idx = hash_index(ip, GHR, tables[providerIdx], numOfEntries);
     if(taken) {
@@ -109,7 +119,6 @@ void Tage::last_branch_result(champsim::address ip, champsim::address branch_tar
     } else {
       tables[providerIdx].entries[idx].predCounter--;
     }
-
     if(providerPrediction != alterPrediction){
       if(providerPrediction == taken) {
         tables[providerIdx].entries[idx].uCounter++;
@@ -117,6 +126,34 @@ void Tage::last_branch_result(champsim::address ip, champsim::address branch_tar
         tables[providerIdx].entries[idx].uCounter--;
       }
     }
+
+  }
+  std::vector<Table> allocatbaleTables;
+  if(finalPrediction != taken) {
+    for(int i = numOfTables - 1; i > providerIdx; i--) {
+        if(tables[i].entries[hash_index(ip, GHR, tables[i], numOfEntries)].uCounter == 0) {
+          allocatbaleTables.push_back(tables[i]);
+        }
+    }
+    if(allocatbaleTables.empty()) {
+      for(int i = numOfTables - 1; i > providerIdx; i--) {
+        tables[i].entries[hash_index(ip, GHR, tables[i], numOfEntries)].uCounter--;         
+      }
+    }
+    double sum = 0;
+    std::vector<double> probability;
+    probability.push_back(1);
+    for(Table table : allocatbaleTables){
+      probability.push_back(probability.back() / 2);
+      sum += probability.back();
+    }
+    for(int i = 0; i < probability.size(); i++) {
+      probability.at(i) /= sum;
+    }
+    Table chosenTable = allocatbaleTables.at(weighted_random_choice(probability));
+    unsigned long long index = hash_index(ip, GHR, chosenTable, numOfEntries);
+    Entry newEntry = Entry(champsim::msl::fwcounter<3>(4), hash_tag(ip, GHR, chosenTable), champsim::msl::fwcounter<2>(0));
+    chosenTable.entries[index] = newEntry;
   }
 
  
