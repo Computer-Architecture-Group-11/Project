@@ -1,6 +1,3 @@
-//
-// Created by mohammadmahdi on 7/18/25.
-//
 
 #ifndef TAGE2_H
 #define TAGE2_H

@@ -1,13 +1,6 @@
-//
-// Created by mohammadmahdi on 7/18/25.
-//
 
 #include "tage2.h"
 #include <random>
-//todo tag lengths (shorter history longer tag)
-//at least 6, 8 and at most 12
-//alpha 1.6 1.7 1.8
-//base 4, 5
 
 void tage2::initialize_branch_predictor()
 {
@@ -45,25 +38,20 @@ unsigned long long foldHist(const std::bitset<GHR_SIZE> &GHR, int histLength, in
 }
 unsigned long long path_history_hash(const std::bitset<PATH_HISTORY_SIZE> &pathHistory, int tableIndex, const std::vector<Table>& tables)
 {
-    /*
-    Use a hash-function to compress the path history
-    */
     unsigned long long A = 0;
     Table table = tables[tableIndex];
     
-    int size = table.histLength > 16 ? 16 : table.histLength; // Size of hash output
+    int size = table.histLength > 16 ? 16 : table.histLength; 
     for (int i = PATH_HISTORY_SIZE - 1; i >= 0; i--)
     {
-        A = (A << 1) | pathHistory[i]; // Build the bit vector a using the path history array
+        A = (A << 1) | pathHistory[i]; 
     }
 
     A = A & ((1 << size) - 1);
     unsigned long long A1;
     unsigned long long A2;
-    A1 = A & ((1 << table.indexWidth) - 1); // Get last M bits of A
-    A2 = A >> table.indexWidth; // Get second last M bits of A
-
-    // Use the hashing from the CBP-4 L-Tage submission
+    A1 = A & ((1 << table.indexWidth) - 1); 
+    A2 = A >> table.indexWidth; 
     A2 = ((A2 << tableIndex) & ((1 << table.indexWidth) - 1)) + (A2 >> abs(table.indexWidth - tableIndex));
     A = A1 ^ A2;
     A = ((A << tableIndex) & ((1 << table.indexWidth) - 1)) + (A >> abs(table.indexWidth - tableIndex));
@@ -73,17 +61,9 @@ unsigned long long path_history_hash(const std::bitset<PATH_HISTORY_SIZE> &pathH
 
 unsigned long long hash_index(champsim::address ip, const std::bitset<GHR_SIZE> &GHR, const std::bitset<PATH_HISTORY_SIZE> &pathHistory, int tableIndex, const std::vector<Table> &tables)
 {
-  // int compLength = static_cast<int>(log2(table.histLength));
-  // auto pc = ip.to<unsigned long long>();
-  // unsigned long long folded_history = foldHist(GHR, table.histLength, compLength);
-
-  // unsigned long long index = pc ^ (pc >> 2) ^ folded_history;
-
-  // return index % numOfEntries; // compLength = log2(table_size)
   Table table = tables[tableIndex];
-  unsigned long long path_history = path_history_hash(pathHistory, tableIndex, tables); // Hash of path history
+  unsigned long long path_history = path_history_hash(pathHistory, tableIndex, tables); 
 
-  // Hash of global history
   unsigned long long global_history_hash = foldHist(GHR, table.histLength, table.indexWidth);
   unsigned long long ip2 = ip.to<unsigned long long>();
 
@@ -91,13 +71,7 @@ unsigned long long hash_index(champsim::address ip, const std::bitset<GHR_SIZE> 
 }
 
 unsigned long long hash_tag(champsim::address ip, const std::bitset<GHR_SIZE> GHR, int tableIndex, const std::vector<Table> &tables)
-{
-  // auto pc = ip.to<unsigned long long>();
-  // unsigned long long folded_history = foldHist(GHR, table.histLength, table.tagWidth);
-
-  // unsigned long long tag = pc ^ (pc >> 3) ^ (folded_history << 1);
-
-  // return tag & ((1 << table.tagWidth) - 1); 
+{ 
   Table table = tables[tableIndex];
   unsigned long long global_history_hash = foldHist(GHR, table.histLength, table.tagWidth);
   global_history_hash ^= foldHist(GHR, table.histLength, table.tagWidth - 1);
@@ -134,9 +108,9 @@ bool tage2::predict_branch(champsim::address ip)
     }
     providerPrediction = tables[providerIdx].entries[index_pred].predCounter >= 4;
     if ((tables[providerIdx].entries[index_pred].predCounter != 3 &&
-        tables[providerIdx].entries[index_pred].predCounter != 4 ) ||
-        tables[providerIdx].entries[index_pred].uCounter.value() != 0 ||
-        altBetterThanProvider <= 7) {   
+      tables[providerIdx].entries[index_pred].predCounter != 4 ) ||
+      tables[providerIdx].entries[index_pred].uCounter.value() != 0 ||
+      altBetterThanProvider <= 7) {   
       finalPrediction = providerPrediction;
     }else{
       finalPrediction = alterPrediction;
@@ -158,24 +132,18 @@ void tage2::reset_u() {
   uResetType1 = !uResetType1;
 }
 
-int weighted_random_choice(const std::vector<double>& probabilities) {
-  static std::random_device rd;
-  static std::mt19937 gen(rd());
-
-  std::discrete_distribution<> dist(probabilities.begin(), probabilities.end());
-  return dist(gen);  // returns index of chosen item
-}
-
 void tage2::last_branch_result(champsim::address ip, champsim::address branch_target, bool taken, uint8_t branch_type)
 {
   biPred.last_branch_result(ip, branch_target, taken, branch_type);
   if(providerIdx != -1) {
     unsigned long long idx = hash_index(ip, GHR, pathHistory, providerIdx, tables);
-    if(taken) {
-      tables[providerIdx].entries[idx].predCounter++;
-    } else {
-      tables[providerIdx].entries[idx].predCounter--;
+    int counter = tables[providerIdx].entries[idx].predCounter.value();
+    if(taken && counter < 7) {
+      counter++;
+    } else if (!taken && counter > 0) {
+      counter--;
     }
+    tables[providerIdx].entries[idx].predCounter = champsim::msl::fwcounter<3>(counter);
     if(providerPrediction != alterPrediction){
       if(providerPrediction == taken) {
         tables[providerIdx].entries[idx].uCounter++;
@@ -188,34 +156,23 @@ void tage2::last_branch_result(champsim::address ip, champsim::address branch_ta
 
   }
   if(finalPrediction != taken) {
-    std::vector<std::pair<int, unsigned long long>> allocatables;
-
-    for (int i = numOfTables - 1; i > providerIdx; i--) {
-      auto idx = hash_index(ip, GHR, pathHistory, i, tables);
-      if (tables[i].entries[idx].uCounter == 0) {
-        allocatables.emplace_back(i, idx);  // store both table and entry index
+    long rand_val = rand();
+    int start_table = providerIdx + 1 + (rand_val & 1) + ((rand_val >> 1) & 1);
+    
+    bool found = false;
+    for (int i = start_table; i < numOfTables; i++) {
+      unsigned long long idx = hash_index(ip, GHR, pathHistory, i, tables);
+      if (tables[i].entries[idx].uCounter.value() == 0) {
+        tables[i].entries[idx] = Entry(champsim::msl::fwcounter<3>(4),
+                                       hash_tag(ip, GHR, i, tables),
+                                       champsim::msl::fwcounter<2>(0));
+        found = true;
+        break;
       }
     }
-    if(allocatables.empty()) {
-      for(int i = numOfTables - 1; i > providerIdx; i--) {
-        tables[i].entries[hash_index(ip, GHR, pathHistory, i, tables)].uCounter--;         
-      }
-    } else {
-      double sum = 0;
-      std::vector<double> probability;
-      probability.push_back(1024);
-      for(std::pair pair : allocatables){
-        probability.push_back(probability.back() / 2);
-        sum += probability.back();
-      }
-      sum -= probability.back();
-      probability.pop_back();
-      for(int i = 0; i < probability.size(); i++) {
-        probability.at(i) /= sum;
-      }
-      auto [chosen_table_idx, index] = allocatables.at(weighted_random_choice(probability));
-      tables[chosen_table_idx].entries[index] = Entry(champsim::msl::fwcounter<3>(4), 
-      hash_tag(ip, GHR, chosen_table_idx, tables), champsim::msl::fwcounter<2>(0));
+    if (!found && start_table < numOfTables) {
+      unsigned long long idx = hash_index(ip, GHR, pathHistory, start_table, tables);
+      tables[start_table].entries[idx].uCounter = champsim::msl::fwcounter<2>(0);
     }
     
   }
