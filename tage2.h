@@ -20,6 +20,9 @@
 #include "modules.h"
 #include "msl/fwcounter.h"
 
+#define GHR_SIZE 1024
+#define PATH_HISTORY_SIZE 64
+
 
 
 class Entry
@@ -38,6 +41,7 @@ class Table
   public:
     int histLength;
     int tagWidth;
+    int indexWidth;
     std::vector<Entry> entries;
 
     Table(int hist_length, int tag_width) : histLength(hist_length), tagWidth(tag_width)
@@ -55,16 +59,18 @@ public:
   int numOfTables = 10;
   int numOfEntries = 2 * 1024;
   double alpha = 1.6;
-  int histLenBase = 4;
+  int histLenBase = 8;
   int clock = 0;
   int resetClock = 256 * 1024;
-  std::bitset<5500> GHR;
+  std::bitset<GHR_SIZE> GHR;
+  std::bitset<PATH_HISTORY_SIZE> pathHistory;
   bool providerPrediction;
   bool alterPrediction;
   bool finalPrediction;
   int providerIdx = -1;
   int alterIdx = -1;
   bool uResetType1 = true; //type 1 is with most significant bit and if not, the least significant
+  champsim::msl::fwcounter<4> altBetterThanProvider;
 
   std::vector<Table> tables;
 
