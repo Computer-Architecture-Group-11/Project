@@ -10,10 +10,10 @@ void tage2::initialize_branch_predictor()
   for (int i = 0; i < numOfTables; i++) {
     tagWidth -= 0.33;
     tables[i].tagWidth = static_cast<int>(tagWidth);     
-    tables[i].indexWidth = 10; //todo change for different tables      
+    tables[i].indexWidth = 10;     
     tables[i].histLength = static_cast<int>(histLenBase * pow(alpha, i - 1) + 0.5);
-    tables[i].entries.resize(numOfEntries);
-    for (int j = 0; j < numOfEntries; j++) {
+    tables[i].entries.resize((1 << tables[i].indexWidth) + 10);
+    for (int j = 0; j < (1 << tables[i].indexWidth); j++) {
       tables[i].entries[j].predCounter = champsim::msl::fwcounter<3>(4);
       tables[i].entries[j].uCounter = champsim::msl::fwcounter<2>(0);
     }

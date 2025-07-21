@@ -54,7 +54,6 @@ class tage2 : champsim::modules::branch_predictor
 public:
   bimodal biPred;
   int numOfTables = 10;
-  int numOfEntries = 2 * 1024;
   double alpha = 1.6;
   int histLenBase = 8;
   int clock = 0;
